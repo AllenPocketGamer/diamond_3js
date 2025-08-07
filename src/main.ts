@@ -112,19 +112,11 @@ async function init(): Promise<void> {
 
     const rgbeLoader = new RGBELoader().setPath('hdri/');
 
-    const hdrTexture = await rgbeLoader.loadAsync('chapel_day_1k.hdr');
+    const hdrTexture = await rgbeLoader.loadAsync('photo_studio_loft_hall_1k.hdr');
     hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
     scene.background = hdrTexture; // Use the HDRI for the background for consistency
     scene.backgroundBlurriness = 0.8;
     scene.environment = hdrTexture;
-
-    // Lighting - The HDRI now provides realistic ambient and directional light.
-    // The manual lights below are no longer necessary and can be removed or disabled.
-    // const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-    // scene.add(ambientLight);
-    // const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
-    // directionalLight.position.set(-5, 5, 5);
-    // scene.add(directionalLight);
 
     // --- Checkerboard Plane Setup ---
     const planeSize = 10;
@@ -150,35 +142,51 @@ async function init(): Promise<void> {
 
     // Define the material first, so it can be used by the GUI and the loadModel function.
     diamondMaterial = new THREE.MeshPhysicalMaterial({
-        metalness: 0.2,
-        roughness: 0.05,
+        roughness: 0.01,
+        metalness: 0.01,
+        
         transmission: 1.0, // Key property for transparency
-        ior: 2.417,        // Index of Refraction for diamond
-        thickness: 1.5,    // Simulates the volume of the material
-        color: 0xffffff,   // Base color of the glass
-        envMapIntensity: 1.0,
+        dispersion: 4.0,
+        thickness: 1.5,
+        ior: 2.7,        // Index of Refraction for diamond
+
+        iridescence: 6.0,
+        iridescenceIOR: 1.2,
+        iridescenceThicknessRange: [100, 400],
+
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.2,
+
+        attenuationDistance: 1.,
+
+        color: 0xffff00,   // Base color of the glass
+        attenuationColor: 0xffff00,
     });
 
     // --- GUI Controls for Diamond Material ---
     const materialFolder = gui.addFolder('Diamond Material');
-    materialFolder.add(diamondMaterial, 'ior', 1.0, 3.0).name('IOR (Refraction)');
-    materialFolder.add(diamondMaterial, 'thickness', 0, 5).name('Thickness');
-    materialFolder.add(diamondMaterial, 'roughness', 0, 1).name('Roughness');
-    materialFolder.add(diamondMaterial, 'metalness', 0, 1).name('Metalness');
-    materialFolder.add(diamondMaterial, 'transmission', 0, 1).name('Transmission');
-    materialFolder.add(diamondMaterial, 'envMapIntensity', 0, 3).name('Environment Intensity');
-    materialFolder.addColor(diamondMaterial, 'color').name('Color');
+    materialFolder.addColor(diamondMaterial, 'color').name('宝石色').onChange(changeColor);
+
+    materialFolder.add(diamondMaterial, 'roughness', 0, 1).name('表面粗糙度').domElement.title = '控制钻石表面的光滑程度，值越小越光滑。';
+    materialFolder.add(diamondMaterial, 'metalness', 0, 1).name('表面金属度').domElement.title = '控制材质的金属性，对于钻石通常保持较低值。';
+    
+    materialFolder.add(diamondMaterial, 'transmission', 0, 1).name('透射度').domElement.title = '控制光线穿透材质的能力，1表示完全透射。';
+
+    materialFolder.add(diamondMaterial, 'iridescence', 0, 10).name('虹彩强度').domElement.title = '材质表面的虹彩效应强度。';
+    materialFolder.add(diamondMaterial, 'iridescenceIOR', 1.0, 2.33).name('虹彩色移强度');
+    materialFolder.add(diamondMaterial.iridescenceThicknessRange, '1', 0, 1000).name('虹彩偏移').domElement.title = '控制虹彩薄膜的厚度，影响虹彩的颜色变化。';
+
     materialFolder.open();
 
     // --- GUI for Model Selection ---
     const modelSelection = {
-        model: '/models/dflat.glb' // Default model
+        model: '/models/diamond.glb' // Default model
     };
 
-    const modelFolder = gui.addFolder('Model Selection');
+    const modelFolder = gui.addFolder('选择模型');
     modelFolder.add(modelSelection, 'model', {
-        '测试钻石': '/models/dflat.glb',
         '工程钻石': '/models/diamond.glb', // Assumes this file exists
+        '测试钻石': '/models/dflat.glb',
     }).name('Select Model').onChange(loadModel);
     modelFolder.open();
 
@@ -271,6 +279,10 @@ function onMouseWheel(event: WheelEvent): void {
 
     // 限制半径
     targetSpherical.radius = Math.max(minRadius, Math.min(maxRadius, targetSpherical.radius));
+}
+
+function changeColor() {
+    diamondMaterial.attenuationColor = diamondMaterial.color;
 }
 
 // --- Main Execution ---
